@@ -1,0 +1,43 @@
+name: Build AeroCena APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download project
+        uses: actions/checkout@v4
+
+      - name: Prepare Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Extract project
+        run: |
+          unzip -q AeroCenaAndroid.zip
+          test -f AeroCenaAndroid/settings.gradle.kts
+
+      - name: Prepare Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Build APK
+        run: |
+          cd AeroCenaAndroid
+          gradle --no-daemon assembleDebug
+
+      - name: Save APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: aerocena-apk
+          path: AeroCenaAndroid/app/build/outputs/apk/debug/app-debug.apk
