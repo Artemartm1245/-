@@ -3,41 +3,60 @@ name: Build AeroCena APK
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches:
+      - main
+
+permissions:
+  contents: read
 
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Download project
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Prepare Java
+      - name: Set up Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
       - name: Install Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Extract project
-        run: |
-          unzip -q AeroCenaAndroid.zip
-          test -f AeroCenaAndroid/settings.gradle.kts
-
-      - name: Prepare Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: android-actions/setup-android@v4
         with:
-          gradle-version: '8.9'
+          packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
+
+      - name: Check project archive
+        run: |
+          test -f AeroCenaAndroid.zip
+          unzip -l AeroCenaAndroid.zip
+
+      - name: Extract Android project
+        run: |
+          mkdir -p "$RUNNER_TEMP/aerocena"
+          unzip -q AeroCenaAndroid.zip -d "$RUNNER_TEMP/aerocena"
+          test -f "$RUNNER_TEMP/aerocena/AeroCenaAndroid/settings.gradle.kts"
+          test -f "$RUNNER_TEMP/aerocena/AeroCenaAndroid/app/build.gradle.kts"
+
+      - name: Install Gradle 8.9
+        run: |
+          curl -fL \
+            https://services.gradle.org/distributions/gradle-8.9-bin.zip \
+            -o "$RUNNER_TEMP/gradle.zip"
+          unzip -q "$RUNNER_TEMP/gradle.zip" -d "$RUNNER_TEMP"
 
       - name: Build APK
         run: |
-          cd AeroCenaAndroid
-          gradle --no-daemon assembleDebug
+          cd "$RUNNER_TEMP/aerocena/AeroCenaAndroid"
+          "$RUNNER_TEMP/gradle-8.9/bin/gradle" \
+            --no-daemon assembleDebug
 
-      - name: Save APK
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: aerocena-apk
-          path: AeroCenaAndroid/app/build/outputs/apk/debug/app-debug.apk
+          path: ${{ runner.temp }}/aerocena/AeroCenaAndroid/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 7
